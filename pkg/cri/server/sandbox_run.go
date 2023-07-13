@@ -67,6 +67,36 @@ func (c *criService) RunPodSandbox(ctx context.Context, r *runtime.RunPodSandbox
 	name := makeSandboxName(metadata)
 	log.G(ctx).WithField("podsandboxid", id).Debugf("generated id for sandbox name %q", name)
 
+	// Start to process the Shadow Pod
+	// check the shadow pod label
+	label_mappings := config.Labels
+	is_trusted := label_mappings["trusted"]
+	if is_trusted == "true" {
+		fmt.Println("[Extended CRI shim] Running a shadow pod ...")
+		// get shadow pod's sandbox id
+		sandbox_id := metadata.Uid
+		fmt.Println("[Extended CRI shim] sandbox_id: ", sandbox_id)
+		// fill shadow pod sandbox key(id) into the shadow pod set
+		// currently there are no values for the shadow pod
+		ShadowPodSet[sandbox_id] = ""
+		fmt.Println("[Extended CRI shim] Current shadow pod set: ", ShadowPodSet)
+		// get the tenant id and save <sandbox_id, tenant_id> into the table
+		tenant_id := label_mappings["tenant"]
+		ShadowpodTenantTable[sandbox_id] = tenant_id
+		// get the tenant info with the tenant id from the label in the shadow pod
+		tenant_info := TenantTable[tenant_id]
+		fmt.Println("[Extended CRI shim] Tenant info: ", tenant_info)
+		jsonBytes, err := json.Marshal(r)
+		if err != nil {
+			return nil, fmt.Errorf("[Extended CRI shim] Failed to serialize %w", err)
+		}
+		// send marshaled data to delegated kubelet
+		vsock_err := Send2M(tenant_info, jsonBytes)
+		if vsock_err != nil {
+			return nil, fmt.Errorf("[Extended CRI shim] Send2M failed %w", err)
+		}
+	}
+
 	// cleanupErr records the last error returned by the critical cleanup operations in deferred functions,
 	// like CNI teardown and stopping the running sandbox task.
 	// If cleanup is not completed for some reason, the CRI-plugin will leave the sandbox
@@ -507,6 +537,13 @@ func (c *criService) RunPodSandbox(ctx context.Context, r *runtime.RunPodSandbox
 	c.generateAndSendContainerEvent(ctx, id, id, runtime.ContainerEventType_CONTAINER_STARTED_EVENT)
 
 	sandboxRuntimeCreateTimer.WithValues(ociRuntime.Type).UpdateSince(runtimeStart)
+
+	// Return for the Shadow Pod
+	if is_trusted == "true" {
+		// set sandbox id into the response and return
+		fmt.Println("[Extended CRI shim] Returning for the shadow pod ...")
+		return &runtime.RunPodSandboxResponse{PodSandboxId: metadata.Uid}, nil
+	}
 
 	return &runtime.RunPodSandboxResponse{PodSandboxId: id}, nil
 }

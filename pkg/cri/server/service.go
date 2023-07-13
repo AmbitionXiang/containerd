@@ -20,9 +20,12 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"os"
 	"path/filepath"
+	"strconv"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -36,6 +39,7 @@ import (
 	"github.com/containerd/containerd/pkg/kmutex"
 	"github.com/containerd/containerd/plugin"
 	cni "github.com/containerd/go-cni"
+	"github.com/mdlayher/vsock"
 	"github.com/sirupsen/logrus"
 	"google.golang.org/grpc"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
@@ -202,8 +206,66 @@ func (c *criService) RegisterTCP(s *grpc.Server) error {
 	return nil
 }
 
+// receive and register the tenant id
+func handleTenantRegistration(conn net.Conn) {
+	defer conn.Close()
+
+	// assume the tenant message is a TenantInfo, aka. {cid, port}
+	var tenant_id string
+	// max buf size: 256 bytes
+	buf := make([]byte, 256)
+	n, err := conn.Read(buf)
+	if err != nil {
+		fmt.Printf("[Extended CRI shim] Failed to read from vsock: %v\n", err)
+		return
+	}
+	fmt.Printf("[Extended CRI shim] Registering tenant [%s] ...\n", buf[:n])
+	// get tenant id
+	tenant_id = string(buf[:n])
+	// get tenantinfo from conn
+	remoteAddr := conn.RemoteAddr().String()
+	remoteParts := strings.Split(remoteAddr, ":")
+	// get cid from vm(cid)
+	var num string
+	parts := strings.Split(remoteParts[0], "(")
+	if len(parts) > 1 {
+		numParts := strings.Split(parts[1], ")")
+		num = numParts[0]
+	} else {
+		fmt.Println("[Extended CRI shim] Cid not found")
+	}
+	remoteCID, _ := strconv.Atoi(num)
+	remotePort, _ := strconv.Atoi(remoteParts[1])
+	// save the tenant_id:tenantinfo into the tenant table
+	fmt.Printf("[Extended CRI shim] Inserting [tenant_id: %s] into the TenantTable with [Cid %d Port %d] ...\n", tenant_id, remoteCID, remotePort)
+	TenantTable[tenant_id] = TenantInfo{Cid: uint32(remoteCID), Port: uint32(remotePort)}
+}
+
+func StartVsockService(port uint32) {
+	listener, err := vsock.Listen(port, nil)
+	if err != nil {
+		fmt.Printf("[Extended CRI shim] Failed to listen on vsock: %v\n", err)
+		return
+	}
+	defer listener.Close()
+	for {
+		conn, err := listener.Accept()
+		if err != nil {
+			fmt.Printf("[Extended CRI shim] Failed to accept vsock connection: %v\n", err)
+			continue
+		}
+		go handleTenantRegistration(conn)
+	}
+}
+
 // Run starts the CRI service.
 func (c *criService) Run(ready func()) error {
+
+	// listen to a specific vsock port (1234)
+	fmt.Println("[Extended CRI shim] Start to listen on vsock")
+	var vsock_port uint32 = 1234
+	go StartVsockService(vsock_port)
+
 	log.L.Info("Start subscribing containerd event")
 	c.eventMonitor.subscribe(c.client)
 

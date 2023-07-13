@@ -18,6 +18,7 @@ package server
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"syscall"
@@ -37,6 +38,24 @@ import (
 // sandbox, they should be forcibly terminated.
 func (c *criService) StopPodSandbox(ctx context.Context, r *runtime.StopPodSandboxRequest) (*runtime.StopPodSandboxResponse, error) {
 	sandbox, err := c.sandboxStore.Get(r.GetPodSandboxId())
+
+	// get the (shadow) pod id
+	sandbox_id := r.GetPodSandboxId()
+	// forward this stop request if the pod is a shadow pod
+	if _, ok := ShadowPodSet[sandbox_id]; ok {
+		fmt.Println("[Extended CRI shim] Stopping a shadow pod ...")
+		// get the tenant id from the ShadowpodTenantTable using the sandbox id
+		tenant_id := ShadowpodTenantTable[sandbox_id]
+		// get the tenant info from the TenantTable
+		tenant_info := TenantTable[tenant_id]
+		jsonBytes, err := json.Marshal(r)
+		if err != nil {
+			return nil, fmt.Errorf("[Extended CRI shim] Failed to serialize %w", err)
+		}
+		// send marshaled requests to the delegated kubelet
+		Send2M(tenant_info, jsonBytes)
+	}
+
 	if err != nil {
 		return nil, fmt.Errorf("an error occurred when try to find sandbox %q: %w",
 			r.GetPodSandboxId(), err)
