@@ -45,11 +45,49 @@ import (
 	"github.com/containerd/containerd/pkg/cri/util"
 	"github.com/containerd/containerd/pkg/netns"
 	"github.com/containerd/containerd/snapshots"
+
+	"github.com/libvirt/libvirt-go"
 )
 
 func init() {
 	typeurl.Register(&sandboxstore.Metadata{},
 		"github.com/containerd/cri/pkg/store/sandbox", "Metadata")
+}
+
+func adjustVMConfig(vmName string, currentVCPUCount uint, currentMemory uint64) error {
+	conn, err := libvirt.NewConnect("qemu:///system")
+	if err != nil {
+		fmt.Println("[Extended CRI shim] Failed to connect to libvirt:", err)
+		return err
+	}
+	defer conn.Close()
+
+	domain, err := conn.LookupDomainByName(vmName)
+	if err != nil {
+		fmt.Println("[Extended CRI shim] Failed to find domain:", err)
+		return err
+	}
+	defer domain.Free()
+
+	vcpuCount := currentVCPUCount
+
+	err = domain.SetVcpus(vcpuCount)
+	if err != nil {
+		fmt.Println("[Extended CRI shim] Failed to set vCPU count:", err)
+		return err
+	}
+	fmt.Println("[Extended CRI shim] vCPU count set successfully!")
+
+	memorySize := currentMemory // KB?
+
+	err = domain.SetMemory(memorySize)
+	if err != nil {
+		fmt.Println("[Extended CRI shim] Failed to set memory:", err)
+		return err
+	}
+
+	fmt.Println("[Extended CRI shim] Memory set successfully!")
+	return nil
 }
 
 // RunPodSandbox creates and starts a pod-level sandbox. Runtimes should ensure
@@ -68,33 +106,89 @@ func (c *criService) RunPodSandbox(ctx context.Context, r *runtime.RunPodSandbox
 	log.G(ctx).WithField("podsandboxid", id).Debugf("generated id for sandbox name %q", name)
 
 	// Start to process the Shadow Pod
+
 	// check the shadow pod label
-	label_mappings := config.Labels
-	is_trusted := label_mappings["trusted"]
+	anotation_mappings := config.Annotations
+	is_trusted := anotation_mappings["trusted"]
+
 	if is_trusted == "true" {
-		fmt.Println("[Extended CRI shim] Running a shadow pod ...")
-		// get shadow pod's sandbox id
-		sandbox_id := metadata.Uid
-		fmt.Println("[Extended CRI shim] sandbox_id: ", sandbox_id)
-		// fill shadow pod sandbox key(id) into the shadow pod set
-		// currently there are no values for the shadow pod
-		ShadowPodSet[sandbox_id] = ""
-		fmt.Println("[Extended CRI shim] Current shadow pod set: ", ShadowPodSet)
-		// get the tenant id and save <sandbox_id, tenant_id> into the table
-		tenant_id := label_mappings["tenant"]
-		ShadowpodTenantTable[sandbox_id] = tenant_id
-		// get the tenant info with the tenant id from the label in the shadow pod
-		tenant_info := TenantTable[tenant_id]
-		fmt.Println("[Extended CRI shim] Tenant info: ", tenant_info)
-		jsonBytes, err := json.Marshal(r)
-		if err != nil {
-			return nil, fmt.Errorf("[Extended CRI shim] Failed to serialize %w", err)
+		// assume we are using "-x-" to label the vcluster pod
+		podFullName := config.Metadata.Name
+		result := strings.Split(podFullName, "-x-")
+		if len(result) == 3 {
+			fmt.Println("[Extended CRI shim] Mode: multi-cluster")
+			tenantId := result[2]
+			podRealNamespace := result[1]
+			podRealName := result[0]
+			fmt.Printf("[Extended CRI shim] Processing shadow pod [%s] in namespace [%s], which belongs to tenant [%s]\n", podRealName, podRealNamespace, tenantId)
+			fmt.Println("[Extended CRI shim] Sending the shadow pod to delegated kubelet ...")
+			// assume we are using vcluster, then the tenant id is retrieved from pod full name
+			tenant_id := tenantId
+
+			// start to adjust the secure VM's size
+			// use a fixed size for tests
+			adjustVMConfig("critestvm", 4, 4194304)
+
+			// get shadow pod's sandbox id
+			sandbox_id := metadata.Uid
+			fmt.Println("[Extended CRI shim] sandbox_id: ", sandbox_id)
+			// fill shadow pod sandbox key(id) into the shadow pod set
+			// currently there are no values for the shadow pod
+			ShadowPodSet[sandbox_id] = ""
+			fmt.Println("[Extended CRI shim] Current shadow pod set: ", ShadowPodSet)
+			// get the tenant id and save <sandbox_id, tenant_id> into the table
+			ShadowpodTenantTable[sandbox_id] = tenant_id
+			// get the tenant info with the tenant id from the label in the shadow pod
+			tenant_info := TenantTable[tenant_id]
+			fmt.Println("[Extended CRI shim] Tenant info: ", tenant_info)
+			// fill the pod config
+			config.Metadata.Name = podRealName
+			config.Metadata.Namespace = podRealNamespace
+			r.Config = config
+			jsonBytes, err := json.Marshal(r)
+			if err != nil {
+				return nil, fmt.Errorf("[Extended CRI shim] Failed to serialize %w", err)
+			}
+			// send marshaled data to delegated kubelet
+			vsock_err := Send2M(tenant_info, jsonBytes)
+			if vsock_err != nil {
+				return nil, fmt.Errorf("[Extended CRI shim] Send2M failed %w", err)
+			}
+		} else if len(result) == 0 {
+			fmt.Println("[Extended CRI shim] Mode: single-cluster")
+			// In single-cluster mode, the tenant id is retrieved from the labels in shadow pod
+			tenant_id := anotation_mappings["tenant"]
+
+			// start to adjust the secure VM's size
+			// use a fixed size for tests
+			adjustVMConfig("critestvm", 4, 4096)
+
+			// get shadow pod's sandbox id
+			sandbox_id := metadata.Uid
+			fmt.Println("[Extended CRI shim] sandbox_id: ", sandbox_id)
+			// fill shadow pod sandbox key(id) into the shadow pod set
+			// currently there are no values for the shadow pod
+			ShadowPodSet[sandbox_id] = ""
+			fmt.Println("[Extended CRI shim] Current shadow pod set: ", ShadowPodSet)
+			// get the tenant id and save <sandbox_id, tenant_id> into the table
+			ShadowpodTenantTable[sandbox_id] = tenant_id
+			// get the tenant info with the tenant id from the label in the shadow pod
+			tenant_info := TenantTable[tenant_id]
+			fmt.Println("[Extended CRI shim] Tenant info: ", tenant_info)
+			jsonBytes, err := json.Marshal(r)
+			if err != nil {
+				return nil, fmt.Errorf("[Extended CRI shim] Failed to serialize %w", err)
+			}
+			// send marshaled data to delegated kubelet
+			vsock_err := Send2M(tenant_info, jsonBytes)
+			if vsock_err != nil {
+				return nil, fmt.Errorf("[Extended CRI shim] Send2M failed %w", err)
+			}
+
+		} else {
+			fmt.Println("Wrong pod name format! The string does not contain enough elements.")
 		}
-		// send marshaled data to delegated kubelet
-		vsock_err := Send2M(tenant_info, jsonBytes)
-		if vsock_err != nil {
-			return nil, fmt.Errorf("[Extended CRI shim] Send2M failed %w", err)
-		}
+
 	}
 
 	// cleanupErr records the last error returned by the critical cleanup operations in deferred functions,

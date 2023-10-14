@@ -293,6 +293,9 @@ github.com/klauspost/compress/zstd/internal/xxhash
 # github.com/klauspost/cpuid/v2 v2.0.4
 ## explicit; go 1.13
 github.com/klauspost/cpuid/v2
+# github.com/libvirt/libvirt-go v7.4.0+incompatible
+## explicit
+github.com/libvirt/libvirt-go
 # github.com/matttproud/golang_protobuf_extensions v1.0.4
 ## explicit; go 1.9
 github.com/matttproud/golang_protobuf_extensions/pbutil

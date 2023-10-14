@@ -210,7 +210,9 @@ func (c *criService) RegisterTCP(s *grpc.Server) error {
 func handleTenantRegistration(conn net.Conn) {
 	defer conn.Close()
 
-	// assume the tenant message is a TenantInfo, aka. {cid, port}
+	// assume the tenant message is
+	// TODO: check the registration mesage
+
 	var tenant_id string
 	// max buf size: 256 bytes
 	buf := make([]byte, 256)

@@ -23,8 +23,8 @@ func Send2M(tenant TenantInfo, data []byte) error {
 	request := append([]byte{request_len}, request_type...)
 	vsock_payload := append(request, data...)
 	fmt.Println("[Extended CRI shim] Vsock payload size: ", int(len(vsock_payload)))
+
 	// connect the vsock using the TenantId
-	fmt.Printf("[Extended CRI shim] Sending payload to [Cid: %d, Port: %d (1234, actually)]\n", tenant.Cid, tenant.Port)
 	// use a fixed port number
 	conn, err := vsock.Dial(tenant.Cid, 1234, nil)
 	// conn, err := vsock.Dial(tenant.Cid, tenant.Port, nil)
@@ -32,7 +32,9 @@ func Send2M(tenant TenantInfo, data []byte) error {
 		return fmt.Errorf("[Extended CRI shim] Failed to connect: %w", err)
 	}
 	defer conn.Close()
-	// send the data
+
+	// sending the data
+	fmt.Printf("[Extended CRI shim] Sending payload to [Cid: %d, Port: %d (1234, actually)]\n", tenant.Cid, tenant.Port)
 	_, err = conn.Write(vsock_payload)
 	if err != nil {
 		return fmt.Errorf("[Extended CRI shim] Failed to send data via vsock: %w", err)
