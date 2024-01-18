@@ -9,7 +9,8 @@ import (
 )
 
 func Send2M(tenant TenantInfo, data []byte) error {
-	fmt.Print("[Extended CRI shim] Calling Send2M\n[Extended CRI shim] Data: ", string(data))
+
+	fmt.Println("[Extended CRI shim] Calling Send2M. Data: ", string(data))
 	// get the request type (aka. the function calls this Send2M)
 	pc, _, _, _ := runtime.Caller(2)
 	caller_name := runtime.FuncForPC(pc).Name()

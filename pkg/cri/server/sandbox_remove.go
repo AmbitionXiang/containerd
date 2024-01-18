@@ -18,6 +18,7 @@ package server
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"time"
 
@@ -32,6 +33,30 @@ import (
 // sandbox, they should be forcibly removed.
 func (c *criService) RemovePodSandbox(ctx context.Context, r *runtime.RemovePodSandboxRequest) (*runtime.RemovePodSandboxResponse, error) {
 	start := time.Now()
+
+	// Start to process the Shadow Pod
+
+	// get the (shadow) pod id from the reqeust
+	sandbox_id := r.GetPodSandboxId()
+	// forward this RemovePodSandbox request if the pod is a shadow pod
+	if _, ok := ShadowPodSet[sandbox_id]; ok {
+		fmt.Println("[Extended CRI shim] Removing a shadow pod ...")
+		// get the tenant id from the ShadowpodTenantTable using the sandbox id
+		tenant_id := ShadowpodTenantTable[sandbox_id]
+		// get the tenant info from the TenantTable
+		tenant_info := TenantTable[tenant_id]
+		jsonBytes, err := json.Marshal(r)
+		if err != nil {
+			return nil, fmt.Errorf("[Extended CRI shim] Failed to serialize %w", err)
+		}
+		// send marshaled requests to the delegated kubelet
+		Send2M(tenant_info, jsonBytes)
+	}
+	//TODO: we should remove the pod from the trusted plane at delegated kubelet
+	//TODO: Send2M should return the response from the delegated kubelet
+
+	//TODO:Still need to remove the shadow pod
+
 	sandbox, err := c.sandboxStore.Get(r.GetPodSandboxId())
 	if err != nil {
 		if !errdefs.IsNotFound(err) {

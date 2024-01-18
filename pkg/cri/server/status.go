@@ -33,6 +33,9 @@ const networkNotReadyReason = "NetworkPluginNotReady"
 func (c *criService) Status(ctx context.Context, r *runtime.StatusRequest) (*runtime.StatusResponse, error) {
 	// As a containerd plugin, if CRI plugin is serving request,
 	// containerd must be ready.
+
+	// fmt.Println("[Extended CRI shim] here we just use host containerd's status")
+
 	runtimeCondition := &runtime.RuntimeCondition{
 		Type:   runtime.RuntimeReady,
 		Status: true,

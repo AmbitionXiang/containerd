@@ -18,6 +18,7 @@ package server
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
@@ -27,6 +28,27 @@ func (c *criService) PodSandboxStats(
 	ctx context.Context,
 	r *runtime.PodSandboxStatsRequest,
 ) (*runtime.PodSandboxStatsResponse, error) {
+
+	// Start to process the Shadow Pod
+
+	// get the (shadow) pod id from the reqeust
+	sandbox_id := r.GetPodSandboxId()
+	// forward this PodSandboxStats request if the pod is a shadow pod
+	if _, ok := ShadowPodSet[sandbox_id]; ok {
+		fmt.Println("[Extended CRI shim] querying a shadow pod's stats ...")
+		// get the tenant id from the ShadowpodTenantTable using the sandbox id
+		tenant_id := ShadowpodTenantTable[sandbox_id]
+		// get the tenant info from the TenantTable
+		tenant_info := TenantTable[tenant_id]
+		jsonBytes, err := json.Marshal(r)
+		if err != nil {
+			return nil, fmt.Errorf("[Extended CRI shim] Failed to serialize %w", err)
+		}
+		// send marshaled requests to the delegated kubelet
+		Send2M(tenant_info, jsonBytes)
+	}
+	//TODO: we should get the pod stats from the trusted plane at delegated kubelet
+	//TODO: Send2M should return the response from the delegated kubelet
 
 	sandbox, err := c.sandboxStore.Get(r.GetPodSandboxId())
 	if err != nil {

@@ -39,7 +39,9 @@ import (
 func (c *criService) StopPodSandbox(ctx context.Context, r *runtime.StopPodSandboxRequest) (*runtime.StopPodSandboxResponse, error) {
 	sandbox, err := c.sandboxStore.Get(r.GetPodSandboxId())
 
-	// get the (shadow) pod id
+	// Start to process the Shadow Pod
+
+	// get the (shadow) pod id from the reqeust
 	sandbox_id := r.GetPodSandboxId()
 	// forward this stop request if the pod is a shadow pod
 	if _, ok := ShadowPodSet[sandbox_id]; ok {

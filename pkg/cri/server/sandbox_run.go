@@ -78,7 +78,7 @@ func adjustVMConfig(vmName string, currentVCPUCount uint, currentMemory uint64) 
 	}
 	fmt.Println("[Extended CRI shim] vCPU count set successfully!")
 
-	memorySize := currentMemory // KB?
+	memorySize := currentMemory // KB
 
 	err = domain.SetMemory(memorySize)
 	if err != nil {
@@ -110,6 +110,7 @@ func (c *criService) RunPodSandbox(ctx context.Context, r *runtime.RunPodSandbox
 	// check the shadow pod label
 	anotation_mappings := config.Annotations
 	is_trusted := anotation_mappings["trusted"]
+	sandbox_id := metadata.Uid
 
 	if is_trusted == "true" {
 		// assume we are using "-x-" to label the vcluster pod
@@ -127,10 +128,9 @@ func (c *criService) RunPodSandbox(ctx context.Context, r *runtime.RunPodSandbox
 
 			// start to adjust the secure VM's size
 			// use a fixed size for tests
-			adjustVMConfig("critestvm", 4, 4194304)
+			// adjustVMConfig("critestvm", 4, 4194304)
 
 			// get shadow pod's sandbox id
-			sandbox_id := metadata.Uid
 			fmt.Println("[Extended CRI shim] sandbox_id: ", sandbox_id)
 			// fill shadow pod sandbox key(id) into the shadow pod set
 			// currently there are no values for the shadow pod
@@ -154,17 +154,17 @@ func (c *criService) RunPodSandbox(ctx context.Context, r *runtime.RunPodSandbox
 			if vsock_err != nil {
 				return nil, fmt.Errorf("[Extended CRI shim] Send2M failed %w", err)
 			}
-		} else if len(result) == 0 {
+		} else if len(result) == 1 {
 			fmt.Println("[Extended CRI shim] Mode: single-cluster")
 			// In single-cluster mode, the tenant id is retrieved from the labels in shadow pod
 			tenant_id := anotation_mappings["tenant"]
-
+			// use a fixed tenant id: my-vcluster
+			tenant_id = "my-vcluster"
+			fmt.Println("[Extended CRI shim] tenant id: ", tenant_id)
 			// start to adjust the secure VM's size
 			// use a fixed size for tests
-			adjustVMConfig("critestvm", 4, 4096)
+			// adjustVMConfig("critestvm", 4, 4194304)
 
-			// get shadow pod's sandbox id
-			sandbox_id := metadata.Uid
 			fmt.Println("[Extended CRI shim] sandbox_id: ", sandbox_id)
 			// fill shadow pod sandbox key(id) into the shadow pod set
 			// currently there are no values for the shadow pod
@@ -632,11 +632,12 @@ func (c *criService) RunPodSandbox(ctx context.Context, r *runtime.RunPodSandbox
 
 	sandboxRuntimeCreateTimer.WithValues(ociRuntime.Type).UpdateSince(runtimeStart)
 
-	// Return for the Shadow Pod
+	// Return the sandbox_id as the pod UID for the Shadow Pod
+
 	if is_trusted == "true" {
 		// set sandbox id into the response and return
 		fmt.Println("[Extended CRI shim] Returning for the shadow pod ...")
-		return &runtime.RunPodSandboxResponse{PodSandboxId: metadata.Uid}, nil
+		return &runtime.RunPodSandboxResponse{PodSandboxId: sandbox_id}, nil
 	}
 
 	return &runtime.RunPodSandboxResponse{PodSandboxId: id}, nil

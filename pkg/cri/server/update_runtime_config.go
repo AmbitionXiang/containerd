@@ -54,6 +54,9 @@ const (
 
 // UpdateRuntimeConfig updates the runtime config. Currently only handles podCIDR updates.
 func (c *criService) UpdateRuntimeConfig(ctx context.Context, r *runtime.UpdateRuntimeConfigRequest) (*runtime.UpdateRuntimeConfigResponse, error) {
+
+	fmt.Println("[Extended CRI shim] here we update the runtime config on the host machine")
+
 	podCIDRs := r.GetRuntimeConfig().GetNetworkConfig().GetPodCidr()
 	if podCIDRs == "" {
 		return &runtime.UpdateRuntimeConfigResponse{}, nil

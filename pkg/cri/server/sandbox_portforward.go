@@ -28,6 +28,16 @@ import (
 
 // PortForward prepares a streaming endpoint to forward ports from a PodSandbox, and returns the address.
 func (c *criService) PortForward(ctx context.Context, r *runtime.PortForwardRequest) (retRes *runtime.PortForwardResponse, retErr error) {
+
+	// Start to process the Shadow Pod
+
+	// get the (shadow) pod id from the reqeust
+	sandbox_id := r.GetPodSandboxId()
+	// forward this PodSandboxStatus request if the pod is a shadow pod
+	if _, ok := ShadowPodSet[sandbox_id]; ok {
+		fmt.Println("[Extended CRI shim] Shadow pod exists but its port should not be exposed to the untrusted plane ...")
+	}
+
 	sandbox, err := c.sandboxStore.Get(r.GetPodSandboxId())
 	if err != nil {
 		return nil, fmt.Errorf("failed to find sandbox %q: %w", r.GetPodSandboxId(), err)

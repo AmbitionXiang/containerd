@@ -34,6 +34,9 @@ const (
 
 // Version returns the runtime name, runtime version and runtime API version.
 func (c *criService) Version(ctx context.Context, r *runtime.VersionRequest) (*runtime.VersionResponse, error) {
+
+	// fmt.Println("[Extended CRI shim] here we just use host containerd's version")
+
 	return &runtime.VersionResponse{
 		Version:           kubeAPIVersion,
 		RuntimeName:       containerName,
