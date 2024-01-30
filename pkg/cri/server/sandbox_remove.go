@@ -52,10 +52,7 @@ func (c *criService) RemovePodSandbox(ctx context.Context, r *runtime.RemovePodS
 		// send marshaled requests to the delegated kubelet
 		Send2M(tenant_info, jsonBytes)
 	}
-	//TODO: we should remove the pod from the trusted plane at delegated kubelet
-	//TODO: Send2M should return the response from the delegated kubelet
-
-	//TODO:Still need to remove the shadow pod
+	//TODO: we should make sure the pod is removed from the trusted plane at delegated kubelet
 
 	sandbox, err := c.sandboxStore.Get(r.GetPodSandboxId())
 	if err != nil {

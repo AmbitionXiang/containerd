@@ -50,7 +50,33 @@ func init() {
 func (c *criService) CreateContainer(ctx context.Context, r *runtime.CreateContainerRequest) (_ *runtime.CreateContainerResponse, retErr error) {
 	config := r.GetConfig()
 	log.G(ctx).Debugf("Container config %+v", config)
+
+	// we also need to handle shadow pod's container here
+
 	sandboxConfig := r.GetSandboxConfig()
+
+	// according to CRI-shim's log, we can get the right shadow pod id from r.GetPodSandboxId()
+	// but shadow pod id was not stored during PodSandbox creation
+	// so we need to query the shadow pod from our own table/ShadowPodSet map[string]string
+
+	if _, exists := ShadowPodSet[r.GetPodSandboxId()]; exists {
+		// generate shadow container id
+		shadow_container_id := util.GenerateID()
+		// store the shadow container id
+		ShadowContainerSet[shadow_container_id] = ""
+		fmt.Println("[Extended CRI shim] Current shadow container set: ", ShadowContainerSet)
+		// store the shadow container id in the shadow pod
+		ShadowPodContainer[r.GetPodSandboxId()] = append(ShadowPodContainer[r.GetPodSandboxId()], shadow_container_id)
+		// print all the shadow container ids which belong to the shadow pod
+		keyToFind := r.GetPodSandboxId()
+		if values, exists := ShadowPodContainer[keyToFind]; exists {
+			fmt.Printf("[Extended CRI shim] Found '%s' 's container: %v\n", keyToFind, values)
+		}
+
+		fmt.Printf("[Extended CRI shim] Returning shadow container id for %s CreateContainerResponse\n", shadow_container_id)
+		return &runtime.CreateContainerResponse{ContainerId: shadow_container_id}, nil
+	}
+
 	sandbox, err := c.sandboxStore.Get(r.GetPodSandboxId())
 	if err != nil {
 		return nil, fmt.Errorf("failed to find sandbox id %q: %w", r.GetPodSandboxId(), err)

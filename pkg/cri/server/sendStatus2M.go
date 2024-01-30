@@ -1,6 +1,8 @@
 package server
 
 import (
+	"bytes"
+	"encoding/json"
 	"fmt"
 	"log"
 
@@ -42,10 +44,24 @@ func SendStatus2M(tenant TenantInfo, data []byte) (*runtime.PodSandboxStatusResp
 	buf := make([]byte, maxByte)
 	n, err := conn.Read(buf)
 	if err != nil {
-		log.Fatalf("[Extended CRI shim] failed to read: %v", err)
+		log.Fatalf("[Extended CRI shim] Failed to read: %v", err)
+	}
+	fmt.Printf("[Extended CRI shim] Received status from server: %s\n", string(buf[:n]))
+
+	podSandboxStatusResponse := &runtime.PodSandboxStatusResponse{}
+	trimmedData := bytes.Trim(buf, "\x00")
+	if err := json.Unmarshal(trimmedData, podSandboxStatusResponse); err != nil {
+		log.Fatalf("Failed to unmarshal PodSandboxStatus: %v", err)
+	}
+	fmt.Println("[Extended CRI shim] Pod sandbox id: ", podSandboxStatusResponse.Status.Id)
+	fmt.Println("[Extended CRI shim] State got: ", podSandboxStatusResponse.Status.State)
+
+	fmt.Println("[Extended CRI shim] Getting container status...", podSandboxStatusResponse.Status.State)
+	for idx := range podSandboxStatusResponse.ContainersStatuses {
+		containerStatus := podSandboxStatusResponse.ContainersStatuses[idx]
+		fmt.Println("[Extended CRI shim] Container id: ", containerStatus.Id)
+		fmt.Println("[Extended CRI shim] Container state: ", containerStatus.State)
 	}
 
-	fmt.Printf("[Extended CRI shim] received status from server: %s\n", string(buf[:n]))
-
-	return nil, nil
+	return podSandboxStatusResponse, nil
 }

@@ -39,6 +39,16 @@ import (
 // StartContainer starts the container.
 func (c *criService) StartContainer(ctx context.Context, r *runtime.StartContainerRequest) (retRes *runtime.StartContainerResponse, retErr error) {
 	start := time.Now()
+
+	// we also need to handle shadow pod's container here
+
+	// check if the container is a shadow container
+	if _, exists := ShadowContainerSet[r.GetContainerId()]; exists {
+
+		// return early
+		return &runtime.StartContainerResponse{}, nil
+	}
+
 	cntr, err := c.containerStore.Get(r.GetContainerId())
 	if err != nil {
 		return nil, fmt.Errorf("an error occurred when try to find container %q: %w", r.GetContainerId(), err)

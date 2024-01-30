@@ -126,12 +126,12 @@ func (c *criService) RunPodSandbox(ctx context.Context, r *runtime.RunPodSandbox
 			// assume we are using vcluster, then the tenant id is retrieved from pod full name
 			tenant_id := tenantId
 
-			// start to adjust the secure VM's size
-			// use a fixed size for tests
+			// // start to adjust the secure VM's size
+			// // use a fixed size for tests
 			// adjustVMConfig("critestvm", 4, 4194304)
 
 			// get shadow pod's sandbox id
-			fmt.Println("[Extended CRI shim] sandbox_id: ", sandbox_id)
+			fmt.Println("[Extended CRI shim] Sandbox id: ", sandbox_id)
 			// fill shadow pod sandbox key(id) into the shadow pod set
 			// currently there are no values for the shadow pod
 			ShadowPodSet[sandbox_id] = ""
@@ -160,14 +160,14 @@ func (c *criService) RunPodSandbox(ctx context.Context, r *runtime.RunPodSandbox
 			tenant_id := anotation_mappings["tenant"]
 			// use a fixed tenant id: my-vcluster
 			tenant_id = "my-vcluster"
-			fmt.Println("[Extended CRI shim] tenant id: ", tenant_id)
-			// start to adjust the secure VM's size
-			// use a fixed size for tests
+			fmt.Println("[Extended CRI shim] Tenant id: ", tenant_id)
+			// // start to adjust the secure VM's size
+			// // use a fixed size for tests
 			// adjustVMConfig("critestvm", 4, 4194304)
 
-			fmt.Println("[Extended CRI shim] sandbox_id: ", sandbox_id)
+			fmt.Println("[Extended CRI shim] Sandbox id: ", sandbox_id)
 			// fill shadow pod sandbox key(id) into the shadow pod set
-			// currently there are no values for the shadow pod
+			// store the shadow pod id
 			ShadowPodSet[sandbox_id] = ""
 			fmt.Println("[Extended CRI shim] Current shadow pod set: ", ShadowPodSet)
 			// get the tenant id and save <sandbox_id, tenant_id> into the table
@@ -186,9 +186,13 @@ func (c *criService) RunPodSandbox(ctx context.Context, r *runtime.RunPodSandbox
 			}
 
 		} else {
-			fmt.Println("Wrong pod name format! The string does not contain enough elements.")
+			fmt.Println("[Extended CRI shim] Wrong pod name format! The string does not contain enough elements.")
 		}
 
+		// set sandbox id into the response and return
+		fmt.Println("[Extended CRI shim] Returning RunPodSandboxResponse for the shadow pod ...")
+		return &runtime.RunPodSandboxResponse{PodSandboxId: sandbox_id}, nil
+		// return later
 	}
 
 	// cleanupErr records the last error returned by the critical cleanup operations in deferred functions,
@@ -222,6 +226,13 @@ func (c *criService) RunPodSandbox(ctx context.Context, r *runtime.RunPodSandbox
 			State: sandboxstore.StateUnknown,
 		},
 	)
+
+	// handle the return of shadow pods
+	if is_trusted == "true" {
+		// set sandbox id into the response and return
+		fmt.Println("[Extended CRI shim] Returning RunPodSandboxResponse for the shadow pod ...")
+		return &runtime.RunPodSandboxResponse{PodSandboxId: sandbox_id}, nil
+	}
 
 	// Ensure sandbox container image snapshot.
 	image, err := c.ensureImageExists(ctx, c.config.SandboxImage, config)
@@ -632,13 +643,10 @@ func (c *criService) RunPodSandbox(ctx context.Context, r *runtime.RunPodSandbox
 
 	sandboxRuntimeCreateTimer.WithValues(ociRuntime.Type).UpdateSince(runtimeStart)
 
-	// Return the sandbox_id as the pod UID for the Shadow Pod
+	// We can return the sandbox_id as the pod UID for the Shadow Pod at the end of RunPodSandbox
+	// if is_trusted == "true" {
 
-	if is_trusted == "true" {
-		// set sandbox id into the response and return
-		fmt.Println("[Extended CRI shim] Returning for the shadow pod ...")
-		return &runtime.RunPodSandboxResponse{PodSandboxId: sandbox_id}, nil
-	}
+	// }
 
 	return &runtime.RunPodSandboxResponse{PodSandboxId: id}, nil
 }

@@ -39,7 +39,7 @@ func (c *criService) PodSandboxStatus(ctx context.Context, r *runtime.PodSandbox
 	sandbox_id := r.GetPodSandboxId()
 	// forward this PodSandboxStatus request if the pod is a shadow pod
 	if _, ok := ShadowPodSet[sandbox_id]; ok {
-		fmt.Println("[Extended CRI shim] querying a shadow pod's status ...")
+		fmt.Println("[Extended CRI shim] Querying trusted pod's status ...")
 		// get the tenant id from the ShadowpodTenantTable using the sandbox id
 		tenant_id := ShadowpodTenantTable[sandbox_id]
 		// get the tenant info from the TenantTable
@@ -49,13 +49,14 @@ func (c *criService) PodSandboxStatus(ctx context.Context, r *runtime.PodSandbox
 			return nil, fmt.Errorf("[Extended CRI shim] Failed to serialize %w", err)
 		}
 		// send marshaled requests to the delegated kubelet
-		SendStatus2M(tenant_info, jsonBytes)
-		// return the response
-
+		response, err := SendStatus2M(tenant_info, jsonBytes)
 		// return response, err
+		if err != nil {
+			return nil, fmt.Errorf("[Extended CRI shim] Failed to get trusted pod's status: %w", err)
+		}
+		fmt.Println("[Extended CRI shim] Returning trusted pod's status ...")
+		return response, nil
 	}
-	//TODO: we should get the pod status from the trusted plane at delegated kubelet
-	//TODO: Send2M should return the response from the delegated kubelet
 
 	sandbox, err := c.sandboxStore.Get(r.GetPodSandboxId())
 	if err != nil {
