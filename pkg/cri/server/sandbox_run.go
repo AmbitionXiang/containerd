@@ -150,9 +150,9 @@ func (c *criService) RunPodSandbox(ctx context.Context, r *runtime.RunPodSandbox
 				return nil, fmt.Errorf("[Extended CRI shim] Failed to serialize %w", err)
 			}
 			// send marshaled data to delegated kubelet
-			vsock_err := Send2M(tenant_info, jsonBytes)
+			vsock_err := SendReq2M(tenant_info, jsonBytes)
 			if vsock_err != nil {
-				return nil, fmt.Errorf("[Extended CRI shim] Send2M failed %w", err)
+				return nil, fmt.Errorf("[Extended CRI shim] SendReq2M failed %w", err)
 			}
 		} else if len(result) == 1 {
 			fmt.Println("[Extended CRI shim] Mode: single-cluster")
@@ -180,9 +180,9 @@ func (c *criService) RunPodSandbox(ctx context.Context, r *runtime.RunPodSandbox
 				return nil, fmt.Errorf("[Extended CRI shim] Failed to serialize %w", err)
 			}
 			// send marshaled data to delegated kubelet
-			vsock_err := Send2M(tenant_info, jsonBytes)
+			vsock_err := SendReq2M(tenant_info, jsonBytes)
 			if vsock_err != nil {
-				return nil, fmt.Errorf("[Extended CRI shim] Send2M failed %w", err)
+				return nil, fmt.Errorf("[Extended CRI shim] SendReq2M failed %w", err)
 			}
 
 		} else {

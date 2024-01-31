@@ -49,7 +49,7 @@ func (c *criService) PodSandboxStatus(ctx context.Context, r *runtime.PodSandbox
 			return nil, fmt.Errorf("[Extended CRI shim] Failed to serialize %w", err)
 		}
 		// send marshaled requests to the delegated kubelet
-		response, err := SendStatus2M(tenant_info, jsonBytes)
+		response, err := SyncStatusWithM(tenant_info, jsonBytes)
 		// return response, err
 		if err != nil {
 			return nil, fmt.Errorf("[Extended CRI shim] Failed to get trusted pod's status: %w", err)

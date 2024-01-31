@@ -68,9 +68,9 @@ func (c *criService) CreateContainer(ctx context.Context, r *runtime.CreateConta
 		// store the shadow container id in the shadow pod
 		ShadowPodContainer[r.GetPodSandboxId()] = append(ShadowPodContainer[r.GetPodSandboxId()], shadow_container_id)
 		// print all the shadow container ids which belong to the shadow pod
-		keyToFind := r.GetPodSandboxId()
-		if values, exists := ShadowPodContainer[keyToFind]; exists {
-			fmt.Printf("[Extended CRI shim] Found '%s' 's container: %v\n", keyToFind, values)
+		shadow_pod_id := r.GetPodSandboxId()
+		if values, exists := ShadowPodContainer[shadow_pod_id]; exists {
+			fmt.Printf("[Extended CRI shim] Found '%s' 's container: %v\n", shadow_pod_id, values)
 		}
 
 		fmt.Printf("[Extended CRI shim] Returning shadow container id for %s CreateContainerResponse\n", shadow_container_id)

@@ -8,7 +8,7 @@ import (
 	"github.com/mdlayher/vsock"
 )
 
-func Send2M(tenant TenantInfo, data []byte) error {
+func SendReq2M(tenant TenantInfo, data []byte) error {
 
 	fmt.Println("[Extended CRI shim] Calling Send2M. Data: ", string(data))
 	// get the request type (aka. the function calls this Send2M)

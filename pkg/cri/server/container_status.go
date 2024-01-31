@@ -30,6 +30,29 @@ import (
 
 // ContainerStatus inspects the container and returns the status.
 func (c *criService) ContainerStatus(ctx context.Context, r *runtime.ContainerStatusRequest) (*runtime.ContainerStatusResponse, error) {
+
+	// we can also return shadow container status here
+	// check if the container is a shadow container
+	if _, exists := ShadowContainerSet[r.GetContainerId()]; exists {
+		shadow_container_id := r.GetContainerId()
+		// query shadow container's status and return it
+		shadowPodStatus := ShadowPodStatus[shadow_container_id]
+		// transform the status.Metadata
+		containerMetadata := &runtime.ContainerMetadata{
+			Name: shadowPodStatus.Metadata.Name,
+		}
+		// here we specify the status as UNKNOWN(3)
+		containerState := runtime.ContainerState_CONTAINER_UNKNOWN
+		containerStatus := &runtime.ContainerStatus{
+			Id:       shadow_container_id,
+			Metadata: containerMetadata,
+			State:    containerState,
+			Labels:   shadowPodStatus.Labels,
+		}
+		fmt.Printf("[Extended CRI shim] Returning shadow container %s status for ContainerStatusResponse\n", shadow_container_id)
+		return &runtime.ContainerStatusResponse{Status: containerStatus}, nil
+	}
+
 	container, err := c.containerStore.Get(r.GetContainerId())
 	if err != nil {
 		return nil, fmt.Errorf("an error occurred when try to find container %q: %w", r.GetContainerId(), err)

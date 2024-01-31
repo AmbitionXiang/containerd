@@ -50,7 +50,7 @@ func (c *criService) RemovePodSandbox(ctx context.Context, r *runtime.RemovePodS
 			return nil, fmt.Errorf("[Extended CRI shim] Failed to serialize %w", err)
 		}
 		// send marshaled requests to the delegated kubelet
-		Send2M(tenant_info, jsonBytes)
+		SendReq2M(tenant_info, jsonBytes)
 	}
 	//TODO: we should make sure the pod is removed from the trusted plane at delegated kubelet
 

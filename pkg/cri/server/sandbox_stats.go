@@ -45,7 +45,7 @@ func (c *criService) PodSandboxStats(
 			return nil, fmt.Errorf("[Extended CRI shim] Failed to serialize %w", err)
 		}
 		// send marshaled requests to the delegated kubelet
-		Send2M(tenant_info, jsonBytes)
+		SendReq2M(tenant_info, jsonBytes)
 	}
 	//TODO: we should get the pod stats from the trusted plane at delegated kubelet
 	//TODO: Send2M should return the response from the delegated kubelet

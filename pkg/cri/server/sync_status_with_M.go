@@ -12,7 +12,7 @@ import (
 
 const maxByte = 4096
 
-func SendStatus2M(tenant TenantInfo, data []byte) (*runtime.PodSandboxStatusResponse, error) {
+func SyncStatusWithM(tenant TenantInfo, data []byte) (*runtime.PodSandboxStatusResponse, error) {
 
 	fmt.Println("[Extended CRI shim] Calling SendStatus2M. Data: ", string(data))
 	// prepare the payload
@@ -53,15 +53,19 @@ func SendStatus2M(tenant TenantInfo, data []byte) (*runtime.PodSandboxStatusResp
 	if err := json.Unmarshal(trimmedData, podSandboxStatusResponse); err != nil {
 		log.Fatalf("Failed to unmarshal PodSandboxStatus: %v", err)
 	}
-	fmt.Println("[Extended CRI shim] Pod sandbox id: ", podSandboxStatusResponse.Status.Id)
+	shadow_pod_id := podSandboxStatusResponse.Status.Id
+	fmt.Println("[Extended CRI shim] Pod sandbox id: ", shadow_pod_id)
 	fmt.Println("[Extended CRI shim] State got: ", podSandboxStatusResponse.Status.State)
 
-	fmt.Println("[Extended CRI shim] Getting container status...", podSandboxStatusResponse.Status.State)
-	for idx := range podSandboxStatusResponse.ContainersStatuses {
-		containerStatus := podSandboxStatusResponse.ContainersStatuses[idx]
-		fmt.Println("[Extended CRI shim] Container id: ", containerStatus.Id)
-		fmt.Println("[Extended CRI shim] Container state: ", containerStatus.State)
-	}
+	// store the status
+	ShadowPodStatus[shadow_pod_id] = podSandboxStatusResponse.Status
+
+	// fmt.Println("[Extended CRI shim] Getting container status...")
+	// for idx := range podSandboxStatusResponse.ContainersStatuses {
+	// 	containerStatus := podSandboxStatusResponse.ContainersStatuses[idx]
+	// 	fmt.Println("[Extended CRI shim] Container id: ", containerStatus.Id)
+	// 	fmt.Println("[Extended CRI shim] Container state: ", containerStatus.State)
+	// }
 
 	return podSandboxStatusResponse, nil
 }
