@@ -107,21 +107,25 @@ func (c *criService) RunPodSandbox(ctx context.Context, r *runtime.RunPodSandbox
 
 	// Start to process the Shadow Pod
 
-	// check the shadow pod label
-	anotation_mappings := config.Annotations
-	is_trusted := anotation_mappings["trusted"]
+	// check the shadow pod's annotations
+	annotation_mappings := config.Annotations
+	is_shadow := annotation_mappings["shadow"]
+	// check the shadow pod's real name/namespace
+	podRealName := annotation_mappings["name"]
+	podRealNamespace := annotation_mappings["namespace"]
+
 	sandbox_id := metadata.Uid
 
-	if is_trusted == "true" {
+	if is_shadow == "true" {
 		// assume we are using "-x-" to label the vcluster pod
 		podFullName := config.Metadata.Name
 		result := strings.Split(podFullName, "-x-")
 		if len(result) == 3 {
 			fmt.Println("[Extended CRI shim] Mode: multi-cluster")
 			tenantId := result[2]
-			podRealNamespace := result[1]
-			podRealName := result[0]
-			fmt.Printf("[Extended CRI shim] Processing shadow pod [%s] in namespace [%s], which belongs to tenant [%s]\n", podRealName, podRealNamespace, tenantId)
+			podNamespace := result[1]
+			podName := result[0]
+			fmt.Printf("[Extended CRI shim] Processing shadow pod [%s] in shadow namespace [%s], which belongs to tenant [%s]\n", podName, podNamespace, tenantId)
 			fmt.Println("[Extended CRI shim] Sending the shadow pod to delegated kubelet ...")
 			// assume we are using vcluster, then the tenant id is retrieved from pod full name
 			tenant_id := tenantId
@@ -154,13 +158,20 @@ func (c *criService) RunPodSandbox(ctx context.Context, r *runtime.RunPodSandbox
 			if vsock_err != nil {
 				return nil, fmt.Errorf("[Extended CRI shim] SendReq2M failed %w", err)
 			}
+
 		} else if len(result) == 1 {
 			fmt.Println("[Extended CRI shim] Mode: single-cluster")
 			// In single-cluster mode, the tenant id is retrieved from the labels in shadow pod
-			tenant_id := anotation_mappings["tenant"]
+			tenant_id := annotation_mappings["tenant"]
 			// use a fixed tenant id: my-vcluster
 			tenant_id = "my-vcluster"
 			fmt.Println("[Extended CRI shim] Tenant id: ", tenant_id)
+
+			// fill the pod config
+			config.Metadata.Name = podRealName
+			config.Metadata.Namespace = podRealNamespace
+			r.Config = config
+
 			// // start to adjust the secure VM's size
 			// // use a fixed size for tests
 			// adjustVMConfig("critestvm", 4, 4194304)
@@ -228,7 +239,7 @@ func (c *criService) RunPodSandbox(ctx context.Context, r *runtime.RunPodSandbox
 	)
 
 	// handle the return of shadow pods
-	if is_trusted == "true" {
+	if is_shadow == "true" {
 		// set sandbox id into the response and return
 		fmt.Println("[Extended CRI shim] Returning RunPodSandboxResponse for the shadow pod ...")
 		return &runtime.RunPodSandboxResponse{PodSandboxId: sandbox_id}, nil
@@ -643,10 +654,8 @@ func (c *criService) RunPodSandbox(ctx context.Context, r *runtime.RunPodSandbox
 
 	sandboxRuntimeCreateTimer.WithValues(ociRuntime.Type).UpdateSince(runtimeStart)
 
-	// We can return the sandbox_id as the pod UID for the Shadow Pod at the end of RunPodSandbox
-	// if is_trusted == "true" {
-
-	// }
+	// We can return the sandbox_id as the pod UID for the Shadow Pod at the end of RunPodSandbox, but we don't want to reproduce the full sandbox container
+	// we only want to create a shadow pod sandbox
 
 	return &runtime.RunPodSandboxResponse{PodSandboxId: id}, nil
 }
