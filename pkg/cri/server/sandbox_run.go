@@ -114,9 +114,8 @@ func (c *criService) RunPodSandbox(ctx context.Context, r *runtime.RunPodSandbox
 	podRealName := annotation_mappings["name"]
 	podRealNamespace := annotation_mappings["namespace"]
 
-	sandbox_id := metadata.Uid
-
 	if is_shadow == "true" {
+		sandbox_id := metadata.Uid
 		// assume we are using "-x-" to label the vcluster pod
 		podFullName := config.Metadata.Name
 		result := strings.Split(podFullName, "-x-")
@@ -202,8 +201,9 @@ func (c *criService) RunPodSandbox(ctx context.Context, r *runtime.RunPodSandbox
 
 		// set sandbox id into the response and return
 		fmt.Println("[Extended CRI shim] Returning RunPodSandboxResponse for the shadow pod ...")
+		// We can return the sandbox_id as the pod UID for the Shadow Pod at the end of RunPodSandbox, but we don't want to reproduce the full sandbox container
+		// we only want to create a shadow pod sandbox
 		return &runtime.RunPodSandboxResponse{PodSandboxId: sandbox_id}, nil
-		// return later
 	}
 
 	// cleanupErr records the last error returned by the critical cleanup operations in deferred functions,
@@ -237,13 +237,6 @@ func (c *criService) RunPodSandbox(ctx context.Context, r *runtime.RunPodSandbox
 			State: sandboxstore.StateUnknown,
 		},
 	)
-
-	// handle the return of shadow pods
-	if is_shadow == "true" {
-		// set sandbox id into the response and return
-		fmt.Println("[Extended CRI shim] Returning RunPodSandboxResponse for the shadow pod ...")
-		return &runtime.RunPodSandboxResponse{PodSandboxId: sandbox_id}, nil
-	}
 
 	// Ensure sandbox container image snapshot.
 	image, err := c.ensureImageExists(ctx, c.config.SandboxImage, config)
@@ -653,9 +646,6 @@ func (c *criService) RunPodSandbox(ctx context.Context, r *runtime.RunPodSandbox
 	c.generateAndSendContainerEvent(ctx, id, id, runtime.ContainerEventType_CONTAINER_STARTED_EVENT)
 
 	sandboxRuntimeCreateTimer.WithValues(ociRuntime.Type).UpdateSince(runtimeStart)
-
-	// We can return the sandbox_id as the pod UID for the Shadow Pod at the end of RunPodSandbox, but we don't want to reproduce the full sandbox container
-	// we only want to create a shadow pod sandbox
 
 	return &runtime.RunPodSandboxResponse{PodSandboxId: id}, nil
 }

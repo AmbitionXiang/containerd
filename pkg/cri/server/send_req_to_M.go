@@ -40,5 +40,12 @@ func SendReq2M(tenant TenantInfo, data []byte) error {
 	if err != nil {
 		return fmt.Errorf("[Extended CRI shim] Failed to send data via vsock: %w", err)
 	}
+
+	buf := make([]byte, 1)
+	_, err = conn.Read(buf)
+	if err != nil {
+		return fmt.Errorf("[Extended CRI shim] Failed to wait for pod running: %v", err)
+	}
+
 	return nil
 }

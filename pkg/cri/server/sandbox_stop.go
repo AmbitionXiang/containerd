@@ -56,6 +56,7 @@ func (c *criService) StopPodSandbox(ctx context.Context, r *runtime.StopPodSandb
 		}
 		// send marshaled requests to the delegated kubelet
 		SendReq2M(tenant_info, jsonBytes)
+		return &runtime.StopPodSandboxResponse{}, nil
 	}
 
 	if err != nil {
