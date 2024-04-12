@@ -52,6 +52,10 @@ func (c *criService) RemovePodSandbox(ctx context.Context, r *runtime.RemovePodS
 		// send marshaled requests to the delegated kubelet
 		SendReq2M(tenant_info, jsonBytes)
 		//TODO: we should make sure the pod is removed from the trusted plane at delegated kubelet
+
+		delete(ShadowPodContainer, sandbox_id)
+		delete(ShadowPodSet, sandbox_id)
+		delete(ShadowpodTenantTable, sandbox_id)
 		return &runtime.RemovePodSandboxResponse{}, nil
 	}
 

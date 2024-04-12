@@ -33,6 +33,12 @@ import (
 func (c *criService) RemoveContainer(ctx context.Context, r *runtime.RemoveContainerRequest) (_ *runtime.RemoveContainerResponse, retErr error) {
 	start := time.Now()
 	ctrID := r.GetContainerId()
+
+	if _, exists := ShadowContainerSet[ctrID]; exists {
+		delete(ShadowContainerSet, ctrID)
+		return &runtime.RemoveContainerResponse{}, nil
+	}
+
 	container, err := c.containerStore.Get(ctrID)
 	if err != nil {
 		if !errdefs.IsNotFound(err) {
