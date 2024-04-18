@@ -192,7 +192,7 @@ func (c *criService) RunPodSandbox(ctx context.Context, r *runtime.RunPodSandbox
 			// send marshaled data to delegated kubelet
 			vsock_err := SendReq2M(tenant_info, jsonBytes)
 			if vsock_err != nil {
-				return nil, fmt.Errorf("[Extended CRI shim] SendReq2M failed %w", err)
+				return nil, fmt.Errorf("[Extended CRI shim] SendReq2M failed %w", vsock_err)
 			}
 
 		} else {
