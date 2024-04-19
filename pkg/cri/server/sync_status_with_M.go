@@ -5,8 +5,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"net"
 
-	"github.com/mdlayher/vsock"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 )
 
@@ -25,8 +25,9 @@ func SyncStatusWithM(tenant TenantInfo, data []byte) (*runtime.PodSandboxStatusR
 
 	// connect the vsock using the TenantId
 	// use a fixed port number
-	conn, err := vsock.Dial(tenant.Cid, 1234, nil)
-	// conn, err := vsock.Dial(tenant.Cid, tenant.Port, nil)
+	// conn, err := vsock.Dial(tenant.Cid, 1234, nil)
+	// // conn, err := vsock.Dial(tenant.Cid, tenant.Port, nil)
+	conn, err := net.Dial("tcp", "192.168.122.66:1234")
 	if err != nil {
 		return nil, fmt.Errorf("[Extended CRI shim] Failed to connect: %w", err)
 	}

@@ -2,10 +2,9 @@ package server
 
 import (
 	"fmt"
+	"net"
 	"runtime"
 	"strings"
-
-	"github.com/mdlayher/vsock"
 )
 
 func SendReq2M(tenant TenantInfo, data []byte) error {
@@ -27,8 +26,10 @@ func SendReq2M(tenant TenantInfo, data []byte) error {
 
 	// connect the vsock using the TenantId
 	// use a fixed port number
-	conn, err := vsock.Dial(tenant.Cid, 1234, nil)
-	// conn, err := vsock.Dial(tenant.Cid, tenant.Port, nil)
+	// conn, err := vsock.Dial(tenant.Cid, 1234, nil)
+	// // conn, err := vsock.Dial(tenant.Cid, tenant.Port, nil)
+
+	conn, err := net.Dial("tcp", "192.168.122.66:1234")
 	if err != nil {
 		return fmt.Errorf("[Extended CRI shim] Failed to connect: %w", err)
 	}
